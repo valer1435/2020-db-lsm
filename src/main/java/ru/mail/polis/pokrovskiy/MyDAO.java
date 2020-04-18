@@ -6,33 +6,36 @@ import ru.mail.polis.Record;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Iterator;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 public class MyDAO implements DAO {
-    private SortedMap<ByteBuffer, ByteBuffer> map;
+    private final SortedMap<ByteBuffer, ByteBuffer> map;
 
-    public MyDAO(){
+    public MyDAO() {
         map = new TreeMap<>();
     }
+
     @NotNull
     @Override
-    public Iterator<Record> iterator(@NotNull ByteBuffer from) throws IOException {
+    public Iterator<Record> iterator(@NotNull final ByteBuffer from) throws IOException {
         // почему-то с комментариями проходит все тесты, без них не проходит один тест
-//        if (!map.containsKey(from)){
-//            throw new NoSuchElementException("No such key");
-//        }
+        //  if (!map.containsKey(from)){
+        //      throw new NoSuchElementException("No such key");
+        // }
 
         return map.tailMap(from).entrySet().stream().map(o -> Record.of(o.getKey(), o.getValue())).iterator();
     }
 
     @Override
-    public void upsert(@NotNull ByteBuffer key, @NotNull ByteBuffer value) throws IOException {
+    public void upsert(@NotNull final ByteBuffer key, @NotNull final ByteBuffer value) throws IOException {
         map.put(key, value);
     }
 
     @Override
-    public void remove(@NotNull ByteBuffer key) throws IOException {
-        if (!map.containsKey(key)){
+    public void remove(@NotNull final ByteBuffer key) throws IOException {
+        if (!map.containsKey(key)) {
             throw new IOException("No such key");
         }
         map.remove(key);

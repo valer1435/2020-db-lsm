@@ -30,9 +30,6 @@ public class MyDAO implements DAO {
 
     @Override
     public void remove(@NotNull final ByteBuffer key) throws IOException {
-        if (!map.containsKey(key)) {
-            throw new IOException("No such key");
-        }
         map.remove(key);
     }
 

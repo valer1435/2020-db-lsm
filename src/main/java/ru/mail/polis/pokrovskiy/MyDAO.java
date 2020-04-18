@@ -20,11 +20,6 @@ public class MyDAO implements DAO {
     @NotNull
     @Override
     public Iterator<Record> iterator(@NotNull final ByteBuffer from) throws IOException {
-        // почему-то с комментариями проходит все тесты, без них не проходит один тест
-        //  if (!map.containsKey(from)){
-        //      throw new NoSuchElementException("No such key");
-        // }
-
         return map.tailMap(from).entrySet().stream().map(o -> Record.of(o.getKey(), o.getValue())).iterator();
     }
 

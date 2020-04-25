@@ -20,7 +20,7 @@ public class MemoryTable {
     }
 
     public Iterator<Cell> iterator(@NotNull final ByteBuffer from) throws IOException {
-        return map.tailMap(from).entrySet().stream().map(o -> Cell.of(o.getKey(), o.getValue())).iterator();
+        return map.tailMap(from).entrySet().stream().map(o -> Cell.of(o.getKey(), o.getValue(), getGeneration())).iterator();
     }
 
     public void upsert(@NotNull final ByteBuffer key, @NotNull final ByteBuffer value) throws IOException {

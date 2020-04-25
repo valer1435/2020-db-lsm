@@ -1,9 +1,11 @@
 package ru.mail.polis.pokrovskiy;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.nio.ByteBuffer;
 import java.util.Comparator;
 
-public class Value {
+public class Value implements Comparable<Value>{
     private long timestamp;
     private ByteBuffer value;
     private boolean isTombstone;
@@ -31,5 +33,9 @@ public class Value {
 
     public boolean isTombstone() {
         return isTombstone;
+    }
+    @Override
+    public int compareTo(final Value o) {
+        return Long.compare(o.getTimestamp(), this.getTimestamp());
     }
 }

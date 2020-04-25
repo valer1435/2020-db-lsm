@@ -42,22 +42,26 @@ public class MyDAO implements DAO {
     public Iterator<Record> iterator(@NotNull final ByteBuffer from) throws IOException {
         ArrayList<Iterator<Cell>> cellIterator = new ArrayList<Iterator<Cell>>();
         for (STable table : sTables) {
-//            Iterator<Cell> it = table.iteratorFromTable(from);
-//            while (it.hasNext()){
-//                System.out.println(it.next().getValue().getTimestamp());
-//            }
             cellIterator.add(table.iteratorFromTable(from));
         }
         cellIterator.add(memTable.iterator(from));
-        final Iterator<Cell> sortedIterator = Iterators.mergeSorted(cellIterator, Comparator.naturalOrder());
+        final UnmodifiableIterator<Cell> sortedIterator =
+                Iterators.mergeSorted(cellIterator, Comparator.naturalOrder());
+
         final Iterator<Cell> collapsedIterator = Iters.collapseEquals(sortedIterator, Cell::getKey);
         final Iterator<Cell> filteredIterator = Iterators.filter(collapsedIterator, cell -> !cell.getValue().isTombstone());
-        return Iterators.transform(filteredIterator, cell -> Record.of(cell.getKey(), cell.getValue().getValue()));
+        Iterator<Record> it = Iterators.transform(filteredIterator, cell -> Record.of(cell.getKey(), cell.getValue().getValue()));
+//        while (it.hasNext()){
+//            System.out.println("ssss");
+//            if (it.next().getKey().equals(from))
+//                System.out.println("match");
+//        }
+        return it;
     }
 
     @Override
     public void upsert(@NotNull final ByteBuffer key, @NotNull final ByteBuffer value) throws IOException {
-        memTable.upsert(key, value);
+        memTable.upsert(key.duplicate(), value.duplicate());
         if (memTable.getSizeInBytes() > maxSize) {
             flush();
         }
@@ -65,7 +69,7 @@ public class MyDAO implements DAO {
 
     @Override
     public void remove(@NotNull final ByteBuffer key) throws IOException {
-        memTable.remove(key);
+        memTable.remove(key.duplicate());
         if (memTable.getSizeInBytes() > maxSize) {
             flush();
         }

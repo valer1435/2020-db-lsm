@@ -1,40 +1,84 @@
 package ru.mail.polis.pokrovskiy;
 
+import com.google.common.collect.Comparators;
+import com.google.common.collect.Iterators;
+
+import com.google.common.collect.UnmodifiableIterator;
 import org.jetbrains.annotations.NotNull;
 import ru.mail.polis.DAO;
+import ru.mail.polis.Iters;
 import ru.mail.polis.Record;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.nio.file.Path;
+import java.util.*;
 
 public class MyDAO implements DAO {
-    private final SortedMap<ByteBuffer, ByteBuffer> map;
+    public static final ByteBuffer MIN_BYTE_BUFFER = ByteBuffer.allocate(0);
+    private long maxSize;
+    private Path filesPath;
+    private MemoryTable memTable;
+    private long generation;
+    private final List<STable> sTables;
+    private final double ALLOW_PERCENT = 0.16;
 
-    public MyDAO() {
-        map = new TreeMap<>();
+
+    public MyDAO(Path filesPath, long maxSize) throws IOException {
+        this.maxSize = (long) (maxSize * ALLOW_PERCENT);
+        this.filesPath = filesPath;
+        sTables = STable.findTables(filesPath);
+        if (sTables.size() != 0) {
+            generation = sTables.stream().max(STable::compareTo).get().getGeneration() + 1;
+        } else {
+            generation = 0;
+        }
+        memTable = new MemoryTable(generation);
+
     }
 
     @NotNull
     @Override
     public Iterator<Record> iterator(@NotNull final ByteBuffer from) throws IOException {
-        return map.tailMap(from).entrySet().stream().map(o -> Record.of(o.getKey(), o.getValue())).iterator();
+        ArrayList<Iterator<Cell>> cellIterator = new ArrayList<Iterator<Cell>>();
+        for (STable table : sTables) {
+//            Iterator<Cell> it = table.iteratorFromTable(from);
+//            while (it.hasNext()){
+//                System.out.println(it.next().getValue().getTimestamp());
+//            }
+            cellIterator.add(table.iteratorFromTable(from));
+        }
+        cellIterator.add(memTable.iterator(from));
+        final Iterator<Cell> sortedIterator = Iterators.mergeSorted(cellIterator, Comparator.naturalOrder());
+        final Iterator<Cell> collapsedIterator = Iters.collapseEquals(sortedIterator, Cell::getKey);
+        final Iterator<Cell> filteredIterator = Iterators.filter(collapsedIterator, cell -> !cell.getValue().isTombstone());
+        return Iterators.transform(filteredIterator, cell -> Record.of(cell.getKey(), cell.getValue().getValue()));
     }
 
     @Override
     public void upsert(@NotNull final ByteBuffer key, @NotNull final ByteBuffer value) throws IOException {
-        map.put(key, value);
+        memTable.upsert(key, value);
+        if (memTable.getSizeInBytes() > maxSize) {
+            flush();
+        }
     }
 
     @Override
     public void remove(@NotNull final ByteBuffer key) throws IOException {
-        map.remove(key);
+        memTable.remove(key);
+        if (memTable.getSizeInBytes() > maxSize) {
+            flush();
+        }
+    }
+
+    public void flush() throws IOException {
+        sTables.add(STable.writeTable(memTable, filesPath));
+        generation += 1;
+        memTable = new MemoryTable(generation);
     }
 
     @Override
     public void close() throws IOException {
-        map.clear();
+        flush();
     }
 }

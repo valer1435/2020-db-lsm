@@ -80,8 +80,6 @@ public class MyDAO implements DAO {
     }
 
     public void flush() throws IOException {
-
-        DebugUtils.flushInfo(memTable);
         sTables.add(STable.writeTable(memTable, filesPath));
         generation += 1;
         memTable = new MemoryTable(generation);

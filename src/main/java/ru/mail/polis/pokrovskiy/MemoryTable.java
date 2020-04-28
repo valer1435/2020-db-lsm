@@ -26,29 +26,24 @@ public class MemoryTable {
     public void upsert(@NotNull final ByteBuffer key, @NotNull final ByteBuffer value) throws IOException {
 
         Value val = new Value(value, false);
-        Value oldValue = map.getOrDefault(key, null);
-        if (oldValue != null) {
-            if (!oldValue.isTombstone()) {
-                sizeInBytes -= oldValue.getValue().limit();
-            }
-        } else {
-            sizeInBytes += key.limit();
+        Value oldValue = map.put(key, val);
+        if (oldValue == null) {
+            sizeInBytes+= key.limit()+val.getValue().limit();
+        }else if (oldValue.isTombstone()){
+            sizeInBytes+= val.getValue().limit();
+        }else{
+            sizeInBytes+= val.getValue().limit()+-oldValue.getValue().limit();
         }
-        sizeInBytes += val.getValue().limit();
-        map.put(key, val);
     }
 
     public void remove(@NotNull final ByteBuffer key) throws IOException {
-        Value val = new Value(null, true);
-        Value oldValue = map.getOrDefault(key, null);
-        if (oldValue != null) {
-            if (!oldValue.isTombstone()) {
-                sizeInBytes -= oldValue.getValue().limit();
-            }
-        } else {
-            sizeInBytes += key.limit();
+        Value oldValue = map.put(key,  new Value(null, true));
+        if (oldValue == null){
+            sizeInBytes+=key.limit();
+        } else if (!oldValue.isTombstone()){
+            sizeInBytes -= oldValue.getValue().limit();
         }
-        map.put(key, val);
+
     }
 
     public long getSizeInBytes() {

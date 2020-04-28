@@ -15,14 +15,16 @@ public class STable implements Comparable<STable> {
     private static final String EXTENTION = ".data";
     private static final String PREFIX = "LSM-DB-GEN-";
 
-    private final Path file;
+
     private long generation;
     private int rowCount;
+    private FileChannel channel;
 
     public STable(Path file,  long generation) throws IOException {
-        this.file = file;
+
+        channel = FileChannel.open(file, StandardOpenOption.READ);
         this.generation = generation;
-        rowCount = receiveRowCount();
+        rowCount = getRowCount();
     }
 
     public static List<STable> findTables(Path path) throws IOException {
@@ -44,55 +46,53 @@ public class STable implements Comparable<STable> {
         return tables;
     }
 
-    public static STable writeTable(MemoryTable table, Path pathToFile) throws IOException {
-        Path path = pathToFile.resolve(PREFIX + table.getGeneration() + EXTENTION);
-        try (FileChannel channel = FileChannel.open(path,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.CREATE_NEW)) {
+public static STable writeTable(MemoryTable table, Path pathToFile) throws IOException {
+    Path path = pathToFile.resolve(PREFIX + table.getGeneration() + EXTENTION);
+    try (FileChannel channel = FileChannel.open(path,
+            StandardOpenOption.WRITE,
+            StandardOpenOption.CREATE_NEW)) {
 
-            final List<Integer> offsetList = new ArrayList<>();
-            Iterator<Cell> it = table.iterator(MyDAO.MIN_BYTE_BUFFER);
-            while (it.hasNext()) {
+        final List<Integer> offsetList = new ArrayList<>();
 
-                offsetList.add((int) channel.position());
+        Iterator<Cell> iter = table.iterator(MyDAO.MIN_BYTE_BUFFER);
+        while (iter.hasNext()) {
+            Cell cell = iter.next();
+            offsetList.add((int) channel.position());
 
-                final Cell cell = it.next();
+            final long keySize = cell.getKey().limit();
+            channel.write(ByteBuffer.allocate(Long.BYTES).putLong(keySize).flip());
+            channel.write(ByteBuffer.allocate((int) keySize).put(cell.getKey()).flip());
 
-                final long keySize = cell.getKey().limit();
-                channel.write(ByteBuffer.allocate(Long.BYTES).putLong(keySize).flip());
-                channel.write(ByteBuffer.allocate((int) keySize).put(cell.getKey()).flip());
+            final long timeStamp = cell.getValue().getTimestamp();
+            channel.write(ByteBuffer.allocate(Long.BYTES).putLong(timeStamp).flip());
 
-                final long timeStamp = cell.getValue().getTimestamp();
-                channel.write(ByteBuffer.allocate(Long.BYTES).putLong(timeStamp).flip());
+            final boolean tombstone = cell.getValue().isTombstone();
+            channel.write(ByteBuffer.allocate(Byte.BYTES).put((byte) (tombstone ? 1 : 0)).flip());
 
-                final boolean tombstone = cell.getValue().isTombstone();
-                channel.write(ByteBuffer.allocate(Byte.BYTES).put((byte) (tombstone ? 1 : 0)).flip());
-
-                if (!tombstone) {
-                    final ByteBuffer value = cell.getValue().getValue();
-                    final long valueSize = value.limit();
-                    channel.write(ByteBuffer.allocate(Long.BYTES).putLong(valueSize).flip());
-                    channel.write(ByteBuffer.allocate((int) valueSize).put(value).flip());
-                }
+            if (!tombstone) {
+                final long valueSize = cell.getValue().getValue().limit();
+                channel.write(ByteBuffer.allocate(Long.BYTES).putLong(valueSize).flip());
+                channel.write(ByteBuffer.allocate((int) valueSize).put(cell.getValue().getValue()).flip());
             }
+        }
 
-            final ByteBuffer offsetByteBuffer = ByteBuffer.allocate(Long.BYTES * offsetList.size());
+        final ByteBuffer offsetByteBuffer = ByteBuffer.allocate(Long.BYTES * offsetList.size());
 
             for (final int offset : offsetList) {
                 offsetByteBuffer.putLong(offset);
             }
 
             channel.write(offsetByteBuffer.flip());
+        final ByteBuffer rowCountBuffer = ByteBuffer.allocate(Integer.BYTES);
+        rowCountBuffer.putInt(offsetList.size()).flip();
+        channel.write(rowCountBuffer);
 
-            channel.write(ByteBuffer.allocate(Integer.BYTES).putInt(offsetList.size()).flip());
-            return new STable(path, table.getGeneration());
-        }
+        return new STable(path, table.getGeneration());
     }
+}
 
-    protected ByteBuffer parseKey(final int index) throws IOException {
-        FileChannel channel = FileChannel.open(file,
-                StandardOpenOption.READ);
-        long offset = receiveOffset(index);
+    protected ByteBuffer getKey(final int index) throws IOException {
+        long offset = getOffset(index);
 
         final ByteBuffer keySizeBuffer = ByteBuffer.allocate(Long.BYTES);
         channel.read(keySizeBuffer, offset);
@@ -102,14 +102,11 @@ public class STable implements Comparable<STable> {
 
         final ByteBuffer keyBuffer = ByteBuffer.allocate((int) keySize);
         channel.read(keyBuffer, offset);
-
         return keyBuffer.rewind();
     }
 
-    protected Cell parseCell(final int index) throws IOException {
-        FileChannel channel = FileChannel.open(file,
-                StandardOpenOption.READ);
-        long offset = receiveOffset(index);
+    protected Cell getCell(final int index) throws IOException {
+        long offset = getOffset(index);
 
         final ByteBuffer keySizeBuffer = ByteBuffer.allocate(Long.BYTES);
         channel.read(keySizeBuffer, offset);
@@ -134,6 +131,7 @@ public class STable implements Comparable<STable> {
         final boolean tombstone = tombstoneBuffer.rewind().get() != 0;
 
         if (tombstone) {
+
             return new Cell(key, new Value(null, timeStamp, true), getGeneration());
         } else {
 
@@ -147,10 +145,14 @@ public class STable implements Comparable<STable> {
 
             final ByteBuffer valueBuffer = ByteBuffer.allocate((int) valueSize);
             channel.read(valueBuffer, offset);
+
             final ByteBuffer value = valueBuffer.rewind();
 
             return new Cell(key, new Value(value, timeStamp, false), getGeneration());
+
         }
+
+
     }
 
 
@@ -167,28 +169,28 @@ public class STable implements Comparable<STable> {
             @Override
             public Cell next() {
                 try {
-                    return parseCell(position++);
+                    return getCell(position++);
                 } catch (IOException e) {
                     throw new RuntimeException();
                 }
             }
         };
     }
-    private int receiveRowCount() throws IOException {
-        FileChannel channel = FileChannel.open(file,
-                StandardOpenOption.READ);
+    private int getRowCount() throws IOException {
+
         final ByteBuffer rowCountBuffer = ByteBuffer.allocate(Integer.BYTES);
         final long rowCountOff = channel.size() - Integer.BYTES;
         channel.read(rowCountBuffer, rowCountOff);
+
         return rowCountBuffer.rewind().getInt();
     }
 
-    private long receiveOffset(final int index) throws IOException {
-        FileChannel channel = FileChannel.open(file,
-                StandardOpenOption.READ);
+    private long getOffset(final int index) throws IOException {
+
         final ByteBuffer offsetBuffer = ByteBuffer.allocate(Long.BYTES);
         final long offsetOff = channel.size() - Integer.BYTES - Long.BYTES * (long) (rowCount - index);
         channel.read(offsetBuffer, offsetOff);
+
         return offsetBuffer.rewind().getLong();
     }
 
@@ -203,7 +205,7 @@ public class STable implements Comparable<STable> {
         while (curLow <= curHigh) {
             final int mid = (curLow + curHigh) / 2;
 
-            final ByteBuffer midKey = parseKey(mid);
+            final ByteBuffer midKey = getKey(mid);
 
             final int compare = midKey.compareTo(from);
 
@@ -216,7 +218,6 @@ public class STable implements Comparable<STable> {
                 return mid;
             }
         }
-        System.out.println(curLow);
         return curLow;
     }
 
@@ -228,5 +229,9 @@ public class STable implements Comparable<STable> {
     @Override
     public int compareTo(@NotNull STable sTable) {
         return Long.compare(generation, sTable.getGeneration());
+    }
+
+    public void close() throws IOException {
+        channel.close();
     }
 }

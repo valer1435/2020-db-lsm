@@ -21,11 +21,12 @@ public class MyDAO implements DAO {
     private MemoryTable memTable;
     private long generation;
     private final List<STable> sTables;
-    private final double ALLOW_PERCENT = 0.16;
+    private final double ALLOW_PERCENT = 0.016;
 
 
     public MyDAO(Path filesPath, long maxSize) throws IOException {
         this.maxSize = (long) (maxSize * ALLOW_PERCENT);
+        System.out.println(this.maxSize);
         this.filesPath = filesPath;
         sTables = STable.findTables(filesPath);
         if (sTables.size() != 0) {
@@ -62,6 +63,7 @@ public class MyDAO implements DAO {
     @Override
     public void upsert(@NotNull final ByteBuffer key, @NotNull final ByteBuffer value) throws IOException {
         memTable.upsert(key.duplicate(), value.duplicate());
+
         if (memTable.getSizeInBytes() > maxSize) {
             flush();
         }
@@ -70,12 +72,16 @@ public class MyDAO implements DAO {
     @Override
     public void remove(@NotNull final ByteBuffer key) throws IOException {
         memTable.remove(key.duplicate());
+
         if (memTable.getSizeInBytes() > maxSize) {
+
             flush();
         }
     }
 
     public void flush() throws IOException {
+
+        DebugUtils.flushInfo(memTable);
         sTables.add(STable.writeTable(memTable, filesPath));
         generation += 1;
         memTable = new MemoryTable(generation);
@@ -83,6 +89,13 @@ public class MyDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        flush();
+        if (memTable.getSizeInBytes() > 0){
+            flush();
+        }
+        for (STable table: sTables
+             ) {
+            table.close();
+        }
+
     }
 }

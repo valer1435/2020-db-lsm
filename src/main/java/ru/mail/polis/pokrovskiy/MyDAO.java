@@ -17,22 +17,22 @@ import java.util.List;
 public class MyDAO implements DAO {
     static final ByteBuffer MIN_BYTE_BUFFER = ByteBuffer.allocate(0);
     private final long maxSize;
-    private Path filesPath;
+    private final Path filesPath;
     private MemoryTable memTable;
     private long generation;
     private final List<STable> tableList;
-    private final double allowPercents = 0.016;
+    private static final double allowPercents = 0.016;
 
     /**
      * @param filesPath - путь до файла
      * @param maxSize - размер хипа
-     * @throws IOException
+     * @throws IOException - сли возникли ошибки с файлами
      */
     public MyDAO(final Path filesPath, final long maxSize) throws IOException {
         this.maxSize = (long) (maxSize * allowPercents);
         this.filesPath = filesPath;
         tableList = STable.findTables(filesPath);
-        generation = tableList.size()+1L;
+        generation = tableList.size() + 1L;
         memTable = new MemoryTable(generation);
 
     }

@@ -26,7 +26,7 @@ public final class STable implements Comparable<STable> {
     private final int rowCount;
     private final FileChannel channel;
 
-    private STable(final Path file, long generation) throws IOException {
+    private STable(final Path file, final long generation) throws IOException {
         channel = FileChannel.open(file, StandardOpenOption.READ);
         this.generation = generation;
         rowCount = getRowCount();
@@ -172,7 +172,7 @@ public final class STable implements Comparable<STable> {
                 try {
                     return getCell(position++);
                 } catch (IOException e) {
-                   return  null;
+                   return null;
                 }
             }
         };
@@ -207,7 +207,6 @@ public final class STable implements Comparable<STable> {
             final ByteBuffer midKey = getKey(mid);
 
             final int compare = midKey.compareTo(from);
-
 
             if (compare < 0) {
                 curLeft = mid + 1;

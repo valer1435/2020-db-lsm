@@ -23,7 +23,7 @@ public class MyDAO implements DAO {
     private final List<STable> tableList;
     private static final double PERCENT = 0.016;
 
-    /** Имплементация Key-value хранилища
+    /** Имплементация Key-value хранилища.
      * @param filesPath - путь до файла
      * @param maxSize - размер хипа
      * @throws IOException - сли возникли ошибки с файлами

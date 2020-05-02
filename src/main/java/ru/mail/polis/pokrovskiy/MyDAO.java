@@ -1,6 +1,5 @@
 package ru.mail.polis.pokrovskiy;
 
-import com.google.common.collect.Comparators;
 import com.google.common.collect.Iterators;
 
 import com.google.common.collect.UnmodifiableIterator;
@@ -15,7 +14,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 public class MyDAO implements DAO {
-    public static final ByteBuffer MIN_BYTE_BUFFER = ByteBuffer.allocate(0);
+    static final ByteBuffer MIN_BYTE_BUFFER = ByteBuffer.allocate(0);
     private long maxSize;
     private Path filesPath;
     private MemoryTable memTable;
@@ -41,7 +40,7 @@ public class MyDAO implements DAO {
     @NotNull
     @Override
     public Iterator<Record> iterator(@NotNull final ByteBuffer from) throws IOException {
-        ArrayList<Iterator<Cell>> cellIterator = new ArrayList<Iterator<Cell>>();
+        ArrayList<Iterator<Cell>> cellIterator = new ArrayList<>();
         for (STable table : sTables) {
             cellIterator.add(table.iteratorFromTable(from));
         }
@@ -51,13 +50,7 @@ public class MyDAO implements DAO {
 
         final Iterator<Cell> collapsedIterator = Iters.collapseEquals(sortedIterator, Cell::getKey);
         final Iterator<Cell> filteredIterator = Iterators.filter(collapsedIterator, cell -> !cell.getValue().isTombstone());
-        Iterator<Record> it = Iterators.transform(filteredIterator, cell -> Record.of(cell.getKey(), cell.getValue().getValue()));
-//        while (it.hasNext()){
-//            System.out.println("ssss");
-//            if (it.next().getKey().equals(from))
-//                System.out.println("match");
-//        }
-        return it;
+        return Iterators.transform(filteredIterator, cell -> Record.of(cell.getKey(), cell.getValue().getValue()));
     }
 
     @Override
@@ -79,7 +72,7 @@ public class MyDAO implements DAO {
         }
     }
 
-    public void flush() throws IOException {
+    private void flush() throws IOException {
         sTables.add(STable.writeTable(memTable, filesPath));
         generation += 1;
         memTable = new MemoryTable(generation);
@@ -87,11 +80,11 @@ public class MyDAO implements DAO {
 
     @Override
     public void close() throws IOException {
-        if (memTable.getSizeInBytes() > 0){
+        if (memTable.getSizeInBytes() > 0) {
             flush();
         }
-        for (STable table: sTables
-             ) {
+        for (STable table : sTables
+        ) {
             table.close();
         }
 

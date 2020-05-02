@@ -20,14 +20,14 @@ public class STable implements Comparable<STable> {
     private int rowCount;
     private FileChannel channel;
 
-    public STable(Path file,  long generation) throws IOException {
+    private STable(Path file, long generation) throws IOException {
 
         channel = FileChannel.open(file, StandardOpenOption.READ);
         this.generation = generation;
         rowCount = getRowCount();
     }
 
-    public static List<STable> findTables(Path path) throws IOException {
+    static List<STable> findTables(Path path) throws IOException {
         List<STable> tables = new ArrayList<>();
         Files.walkFileTree(path, EnumSet.noneOf(FileVisitOption.class), 1, new SimpleFileVisitor<>() {
             @Override
@@ -46,52 +46,52 @@ public class STable implements Comparable<STable> {
         return tables;
     }
 
-public static STable writeTable(MemoryTable table, Path pathToFile) throws IOException {
-    Path path = pathToFile.resolve(PREFIX + table.getGeneration() + EXTENTION);
-    try (FileChannel channel = FileChannel.open(path,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.CREATE_NEW)) {
+    static STable writeTable(MemoryTable table, Path pathToFile) throws IOException {
+        Path path = pathToFile.resolve(PREFIX + table.getGeneration() + EXTENTION);
+        try (FileChannel channel = FileChannel.open(path,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.CREATE_NEW)) {
 
-        final List<Integer> offsetList = new ArrayList<>();
+            final List<Integer> offsetList = new ArrayList<>();
 
-        Iterator<Cell> iter = table.iterator(MyDAO.MIN_BYTE_BUFFER);
-        while (iter.hasNext()) {
-            Cell cell = iter.next();
-            offsetList.add((int) channel.position());
+            Iterator<Cell> iter = table.iterator(MyDAO.MIN_BYTE_BUFFER);
+            while (iter.hasNext()) {
+                Cell cell = iter.next();
+                offsetList.add((int) channel.position());
 
-            final long keySize = cell.getKey().limit();
-            channel.write(ByteBuffer.allocate(Long.BYTES).putLong(keySize).flip());
-            channel.write(ByteBuffer.allocate((int) keySize).put(cell.getKey()).flip());
+                final long keySize = cell.getKey().limit();
+                channel.write(ByteBuffer.allocate(Long.BYTES).putLong(keySize).flip());
+                channel.write(ByteBuffer.allocate((int) keySize).put(cell.getKey()).flip());
 
-            final long timeStamp = cell.getValue().getTimestamp();
-            channel.write(ByteBuffer.allocate(Long.BYTES).putLong(timeStamp).flip());
+                final long timeStamp = cell.getValue().getTimestamp();
+                channel.write(ByteBuffer.allocate(Long.BYTES).putLong(timeStamp).flip());
 
-            final boolean tombstone = cell.getValue().isTombstone();
-            channel.write(ByteBuffer.allocate(Byte.BYTES).put((byte) (tombstone ? 1 : 0)).flip());
+                final boolean tombstone = cell.getValue().isTombstone();
+                channel.write(ByteBuffer.allocate(Byte.BYTES).put((byte) (tombstone ? 1 : 0)).flip());
 
-            if (!tombstone) {
-                final long valueSize = cell.getValue().getValue().limit();
-                channel.write(ByteBuffer.allocate(Long.BYTES).putLong(valueSize).flip());
-                channel.write(ByteBuffer.allocate((int) valueSize).put(cell.getValue().getValue()).flip());
+                if (!tombstone) {
+                    final long valueSize = cell.getValue().getValue().limit();
+                    channel.write(ByteBuffer.allocate(Long.BYTES).putLong(valueSize).flip());
+                    channel.write(ByteBuffer.allocate((int) valueSize).put(cell.getValue().getValue()).flip());
+                }
             }
-        }
 
-        final ByteBuffer offsetByteBuffer = ByteBuffer.allocate(Long.BYTES * offsetList.size());
+            final ByteBuffer offsetByteBuffer = ByteBuffer.allocate(Long.BYTES * offsetList.size());
 
             for (final int offset : offsetList) {
                 offsetByteBuffer.putLong(offset);
             }
 
             channel.write(offsetByteBuffer.flip());
-        final ByteBuffer rowCountBuffer = ByteBuffer.allocate(Integer.BYTES);
-        rowCountBuffer.putInt(offsetList.size()).flip();
-        channel.write(rowCountBuffer);
+            final ByteBuffer rowCountBuffer = ByteBuffer.allocate(Integer.BYTES);
+            rowCountBuffer.putInt(offsetList.size()).flip();
+            channel.write(rowCountBuffer);
 
-        return new STable(path, table.getGeneration());
+            return new STable(path, table.getGeneration());
+        }
     }
-}
 
-    protected ByteBuffer getKey(final int index) throws IOException {
+    private ByteBuffer getKey(final int index) throws IOException {
         long offset = getOffset(index);
 
         final ByteBuffer keySizeBuffer = ByteBuffer.allocate(Long.BYTES);
@@ -105,7 +105,7 @@ public static STable writeTable(MemoryTable table, Path pathToFile) throws IOExc
         return keyBuffer.rewind();
     }
 
-    protected Cell getCell(final int index) throws IOException {
+    private Cell getCell(final int index) throws IOException {
         long offset = getOffset(index);
 
         final ByteBuffer keySizeBuffer = ByteBuffer.allocate(Long.BYTES);
@@ -156,7 +156,7 @@ public static STable writeTable(MemoryTable table, Path pathToFile) throws IOExc
     }
 
 
-    public Iterator<Cell> iteratorFromTable(ByteBuffer from) throws IOException {
+    Iterator<Cell> iteratorFromTable(ByteBuffer from) throws IOException {
         return new Iterator<>() {
 
             private int position = findIndex(from, 0, rowCount - 1);
@@ -176,6 +176,7 @@ public static STable writeTable(MemoryTable table, Path pathToFile) throws IOExc
             }
         };
     }
+
     private int getRowCount() throws IOException {
 
         final ByteBuffer rowCountBuffer = ByteBuffer.allocate(Integer.BYTES);
@@ -194,16 +195,16 @@ public static STable writeTable(MemoryTable table, Path pathToFile) throws IOExc
         return offsetBuffer.rewind().getLong();
     }
 
-    public static int getVersionFromName(String fileName) {
+    private static int getVersionFromName(String fileName) {
         return Integer.parseInt(Iterables.get(Splitter.on("LSM-DB-GEN-").split(fileName), 1).replaceAll("\\.data", ""));
     }
 
-    public int findIndex(ByteBuffer from, int low, int high) throws IOException {
-        int curLow = low;
-        int curHigh = high;
+    private int findIndex(ByteBuffer from, int left, int right) throws IOException {
+        int curLeft = left;
+        int curRight = right;
 
-        while (curLow <= curHigh) {
-            final int mid = (curLow + curHigh) / 2;
+        while (curLeft <= curRight) {
+            final int mid = (curLeft + curRight) / 2;
 
             final ByteBuffer midKey = getKey(mid);
 
@@ -211,18 +212,18 @@ public static STable writeTable(MemoryTable table, Path pathToFile) throws IOExc
 
 
             if (compare < 0) {
-                curLow = mid + 1;
+                curLeft = mid + 1;
             } else if (compare > 0) {
-                curHigh = mid - 1;
+                curRight = mid - 1;
             } else {
                 return mid;
             }
         }
-        return curLow;
+        return curLeft;
     }
 
 
-    public long getGeneration() {
+    long getGeneration() {
         return generation;
     }
 
@@ -231,7 +232,7 @@ public static STable writeTable(MemoryTable table, Path pathToFile) throws IOExc
         return Long.compare(generation, sTable.getGeneration());
     }
 
-    public void close() throws IOException {
+    void close() throws IOException {
         channel.close();
     }
 }

@@ -1,8 +1,6 @@
 package ru.mail.polis.pokrovskiy;
 
 import org.jetbrains.annotations.NotNull;
-import ru.mail.polis.Record;
-
 import java.nio.ByteBuffer;
 import java.util.Comparator;
 
@@ -14,7 +12,7 @@ public class Cell implements Comparable<Cell> {
     Cell(
             @NotNull final ByteBuffer key,
             @NotNull final Value value,
-            @NotNull final long generation) {
+             final long generation) {
         this.key = key;
         this.value = value;
         this.generation = generation;
@@ -23,7 +21,7 @@ public class Cell implements Comparable<Cell> {
     public static Cell of(
             @NotNull final ByteBuffer key,
             @NotNull final Value value,
-            @NotNull final long generation) {
+            final long generation) {
         return new Cell(key, value, generation);
     }
 
@@ -35,7 +33,7 @@ public class Cell implements Comparable<Cell> {
         return value;
     }
 
-    public long getGeneration() {
+    private long getGeneration() {
         return generation;
     }
 

@@ -1,37 +1,38 @@
 package ru.mail.polis.pokrovskiy;
 
 import com.google.common.collect.Iterators;
-
 import com.google.common.collect.UnmodifiableIterator;
 import org.jetbrains.annotations.NotNull;
 import ru.mail.polis.DAO;
 import ru.mail.polis.Iters;
 import ru.mail.polis.Record;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
 
 public class MyDAO implements DAO {
     static final ByteBuffer MIN_BYTE_BUFFER = ByteBuffer.allocate(0);
-    private long maxSize;
+    private final long maxSize;
     private Path filesPath;
     private MemoryTable memTable;
     private long generation;
-    private final List<STable> sTables;
-    private final double ALLOW_PERCENT = 0.016;
+    private final List<STable> tableList;
+    private final double allowPercents = 0.016;
 
-
-    public MyDAO(Path filesPath, long maxSize) throws IOException {
-        this.maxSize = (long) (maxSize * ALLOW_PERCENT);
+    /**
+     * @param filesPath - путь до файла
+     * @param maxSize - размер хипа
+     * @throws IOException
+     */
+    public MyDAO(final Path filesPath, final long maxSize) throws IOException {
+        this.maxSize = (long) (maxSize * allowPercents);
         this.filesPath = filesPath;
-        sTables = STable.findTables(filesPath);
-        if (sTables.size() != 0) {
-            generation = sTables.stream().max(STable::compareTo).get().getGeneration() + 1;
-        } else {
-            generation = 0;
-        }
+        tableList = STable.findTables(filesPath);
+        generation = tableList.size()+1L;
         memTable = new MemoryTable(generation);
 
     }
@@ -39,8 +40,8 @@ public class MyDAO implements DAO {
     @NotNull
     @Override
     public Iterator<Record> iterator(@NotNull final ByteBuffer from) throws IOException {
-        ArrayList<Iterator<Cell>> cellIterator = new ArrayList<>();
-        for (STable table : sTables) {
+        final ArrayList<Iterator<Cell>> cellIterator = new ArrayList<>();
+        for (final STable table : tableList) {
             cellIterator.add(table.iteratorFromTable(from));
         }
         cellIterator.add(memTable.iterator(from));
@@ -48,8 +49,9 @@ public class MyDAO implements DAO {
                 Iterators.mergeSorted(cellIterator, Comparator.naturalOrder());
 
         final Iterator<Cell> collapsedIterator = Iters.collapseEquals(sortedIterator, Cell::getKey);
-        final Iterator<Cell> filteredIterator = Iterators.filter(collapsedIterator, cell -> !cell.getValue().isTombstone());
-        return Iterators.transform(filteredIterator, cell -> Record.of(cell.getKey(), cell.getValue().getValue()));
+        final Iterator<Cell> filteredIterator = Iterators
+                .filter(collapsedIterator, cell -> !cell.getValue().isTombstone());
+        return Iterators.transform(filteredIterator, cell -> Record.of(cell.getKey(), cell.getValue().getData()));
     }
 
     @Override
@@ -72,7 +74,7 @@ public class MyDAO implements DAO {
     }
 
     private void flush() throws IOException {
-        sTables.add(STable.writeTable(memTable, filesPath));
+        tableList.add(STable.writeTable(memTable, filesPath));
         generation += 1;
         memTable = new MemoryTable(generation);
     }
@@ -82,7 +84,7 @@ public class MyDAO implements DAO {
         if (memTable.getSizeInBytes() > 0) {
             flush();
         }
-        for (STable table : sTables
+        for (final STable table : tableList
         ) {
             table.close();
         }

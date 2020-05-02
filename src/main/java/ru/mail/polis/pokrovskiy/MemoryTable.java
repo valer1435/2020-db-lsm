@@ -12,35 +12,36 @@ class MemoryTable {
     private long sizeInBytes;
     private final long generation;
 
-
-    MemoryTable(long generation) {
+    MemoryTable(final long generation) {
         map = new TreeMap<>();
         this.generation = generation;
     }
 
     Iterator<Cell> iterator(@NotNull final ByteBuffer from) {
-        return map.tailMap(from).entrySet().stream().map(o -> Cell.of(o.getKey(), o.getValue(), getGeneration())).iterator();
+        return map.tailMap(from).entrySet()
+                .stream()
+                .map(o -> Cell.of(o.getKey(), o.getValue(), getGeneration())).iterator();
     }
 
     void upsert(@NotNull final ByteBuffer key, @NotNull final ByteBuffer value) {
 
-        Value val = new Value(value, false);
-        Value oldValue = map.put(key, val);
+        final Value val = new Value(value, false);
+        final Value oldValue = map.put(key, val);
         if (oldValue == null) {
-            sizeInBytes += key.limit() + val.getValue().limit();
+            sizeInBytes += key.limit() + val.getData().limit();
         } else if (oldValue.isTombstone()) {
-            sizeInBytes += val.getValue().limit();
+            sizeInBytes += val.getData().limit();
         } else {
-            sizeInBytes += val.getValue().limit() + -oldValue.getValue().limit();
+            sizeInBytes += val.getData().limit() + -oldValue.getData().limit();
         }
     }
 
     void remove(@NotNull final ByteBuffer key) {
-        Value oldValue = map.put(key, new Value(null, true));
+        final Value oldValue = map.put(key, new Value(null, true));
         if (oldValue == null) {
             sizeInBytes += key.limit();
         } else if (!oldValue.isTombstone()) {
-            sizeInBytes -= oldValue.getValue().limit();
+            sizeInBytes -= oldValue.getData().limit();
         }
 
     }

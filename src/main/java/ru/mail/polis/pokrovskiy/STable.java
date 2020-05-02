@@ -7,28 +7,33 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.file.*;
+import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.List;
 
-public class STable implements Comparable<STable> {
+public final class STable implements Comparable<STable> {
     private static final String EXTENTION = ".data";
     private static final String PREFIX = "LSM-DB-GEN-";
+    private final long generation;
+    private final int rowCount;
+    private final FileChannel channel;
 
-
-    private long generation;
-    private int rowCount;
-    private FileChannel channel;
-
-    private STable(Path file, long generation) throws IOException {
-
+    private STable(final Path file, long generation) throws IOException {
         channel = FileChannel.open(file, StandardOpenOption.READ);
         this.generation = generation;
         rowCount = getRowCount();
     }
 
-    static List<STable> findTables(Path path) throws IOException {
-        List<STable> tables = new ArrayList<>();
+    static List<STable> findTables(final Path path) throws IOException {
+        final List<STable> tables = new ArrayList<>();
         Files.walkFileTree(path, EnumSet.noneOf(FileVisitOption.class), 1, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(
@@ -46,17 +51,17 @@ public class STable implements Comparable<STable> {
         return tables;
     }
 
-    static STable writeTable(MemoryTable table, Path pathToFile) throws IOException {
-        Path path = pathToFile.resolve(PREFIX + table.getGeneration() + EXTENTION);
+    static STable writeTable(final MemoryTable table, final Path pathToFile) throws IOException {
+        final Path path = pathToFile.resolve(PREFIX + table.getGeneration() + EXTENTION);
         try (FileChannel channel = FileChannel.open(path,
                 StandardOpenOption.WRITE,
                 StandardOpenOption.CREATE_NEW)) {
 
             final List<Integer> offsetList = new ArrayList<>();
 
-            Iterator<Cell> iter = table.iterator(MyDAO.MIN_BYTE_BUFFER);
+            final Iterator<Cell> iter = table.iterator(MyDAO.MIN_BYTE_BUFFER);
             while (iter.hasNext()) {
-                Cell cell = iter.next();
+                final Cell cell = iter.next();
                 offsetList.add((int) channel.position());
 
                 final long keySize = cell.getKey().limit();
@@ -70,9 +75,9 @@ public class STable implements Comparable<STable> {
                 channel.write(ByteBuffer.allocate(Byte.BYTES).put((byte) (tombstone ? 1 : 0)).flip());
 
                 if (!tombstone) {
-                    final long valueSize = cell.getValue().getValue().limit();
+                    final long valueSize = cell.getValue().getData().limit();
                     channel.write(ByteBuffer.allocate(Long.BYTES).putLong(valueSize).flip());
-                    channel.write(ByteBuffer.allocate((int) valueSize).put(cell.getValue().getValue()).flip());
+                    channel.write(ByteBuffer.allocate((int) valueSize).put(cell.getValue().getData()).flip());
                 }
             }
 
@@ -149,14 +154,10 @@ public class STable implements Comparable<STable> {
             final ByteBuffer value = valueBuffer.rewind();
 
             return new Cell(key, new Value(value, timeStamp, false), getGeneration());
-
         }
-
-
     }
 
-
-    Iterator<Cell> iteratorFromTable(ByteBuffer from) throws IOException {
+    Iterator<Cell> iteratorFromTable(final ByteBuffer from) throws IOException {
         return new Iterator<>() {
 
             private int position = findIndex(from, 0, rowCount - 1);
@@ -171,14 +172,13 @@ public class STable implements Comparable<STable> {
                 try {
                     return getCell(position++);
                 } catch (IOException e) {
-                    throw new RuntimeException();
+                   return  null;
                 }
             }
         };
     }
 
     private int getRowCount() throws IOException {
-
         final ByteBuffer rowCountBuffer = ByteBuffer.allocate(Integer.BYTES);
         final long rowCountOff = channel.size() - Integer.BYTES;
         channel.read(rowCountBuffer, rowCountOff);
@@ -187,19 +187,17 @@ public class STable implements Comparable<STable> {
     }
 
     private long getOffset(final int index) throws IOException {
-
         final ByteBuffer offsetBuffer = ByteBuffer.allocate(Long.BYTES);
         final long offsetOff = channel.size() - Integer.BYTES - Long.BYTES * (long) (rowCount - index);
         channel.read(offsetBuffer, offsetOff);
-
         return offsetBuffer.rewind().getLong();
     }
 
-    private static int getVersionFromName(String fileName) {
+    private static int getVersionFromName(final String fileName) {
         return Integer.parseInt(Iterables.get(Splitter.on("LSM-DB-GEN-").split(fileName), 1).replaceAll("\\.data", ""));
     }
 
-    private int findIndex(ByteBuffer from, int left, int right) throws IOException {
+    private int findIndex(final ByteBuffer from, final int left, final int right) throws IOException {
         int curLeft = left;
         int curRight = right;
 
@@ -222,14 +220,13 @@ public class STable implements Comparable<STable> {
         return curLeft;
     }
 
-
     long getGeneration() {
         return generation;
     }
 
     @Override
-    public int compareTo(@NotNull STable sTable) {
-        return Long.compare(generation, sTable.getGeneration());
+    public int compareTo(@NotNull final STable table) {
+        return Long.compare(generation, table.getGeneration());
     }
 
     void close() throws IOException {

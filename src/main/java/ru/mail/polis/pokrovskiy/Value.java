@@ -3,19 +3,19 @@ package ru.mail.polis.pokrovskiy;
 import java.nio.ByteBuffer;
 
 public class Value implements Comparable<Value> {
-    private long timestamp;
-    private ByteBuffer value;
-    private boolean isTombstone;
+    private final long timestamp;
+    private final ByteBuffer data;
+    private final boolean isTombstone;
 
-    Value(ByteBuffer value, boolean isTombstone) {
-        this.value = value;
+    Value(final ByteBuffer data, final boolean isTombstone) {
+        this.data = data;
 
         timestamp = System.currentTimeMillis();
         this.isTombstone = isTombstone;
     }
 
-    Value(ByteBuffer value, long timestamp, boolean isTombstone) {
-        this.value = value;
+    Value(final ByteBuffer data, final long timestamp, final boolean isTombstone) {
+        this.data = data;
         this.timestamp = timestamp;
         this.isTombstone = isTombstone;
     }
@@ -24,8 +24,8 @@ public class Value implements Comparable<Value> {
         return timestamp;
     }
 
-    public ByteBuffer getValue() {
-        return value;
+    ByteBuffer getData() {
+        return data;
     }
 
     boolean isTombstone() {

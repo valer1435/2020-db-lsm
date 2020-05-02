@@ -38,7 +38,7 @@ public class Cell implements Comparable<Cell> {
     }
 
     @Override
-    public int compareTo(@NotNull Cell cell) {
+    public int compareTo(@NotNull final Cell cell) {
         return Comparator
                 .comparing(Cell::getKey)
                 .thenComparing(Cell::getValue)

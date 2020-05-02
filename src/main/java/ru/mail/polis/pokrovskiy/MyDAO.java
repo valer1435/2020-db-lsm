@@ -25,7 +25,6 @@ public class MyDAO implements DAO {
 
     public MyDAO(Path filesPath, long maxSize) throws IOException {
         this.maxSize = (long) (maxSize * ALLOW_PERCENT);
-        System.out.println(this.maxSize);
         this.filesPath = filesPath;
         sTables = STable.findTables(filesPath);
         if (sTables.size() != 0) {

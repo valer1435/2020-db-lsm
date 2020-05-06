@@ -28,7 +28,7 @@ public class MyDAO implements DAO {
      * @param maxSize - максимальный размер
      * @throws IOException - сли возникли ошибки с файлами
      */
-    public MyDAO(@NotNull Path filesPath, final long maxSize) throws IOException {
+    public MyDAO(@NotNull final Path filesPath, final long maxSize) throws IOException {
         this.maxSize = (long) (maxSize * PERCENT);
         this.filesPath = filesPath;
         this.tableList = STable.findTables(filesPath);
@@ -66,7 +66,7 @@ public class MyDAO implements DAO {
     }
 
     private void flushIfNeed() throws IOException {
-        if (memTable.getSizeInBytes() > maxSize){
+        if (memTable.getSizeInBytes() > maxSize) {
             flush();
         }
     }

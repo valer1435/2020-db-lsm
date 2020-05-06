@@ -3,8 +3,6 @@ package ru.mail.polis.pokrovskiy;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -51,6 +49,7 @@ public final class STable implements Comparable<STable> {
         });
         return tables;
     }
+
     @NotNull
     static STable writeTable(@NotNull final MemoryTable table, @NotNull final Path pathToFile) throws IOException {
         final Path path = pathToFile.resolve(PREFIX + table.getGeneration() + EXTENSION);
@@ -96,6 +95,7 @@ public final class STable implements Comparable<STable> {
             return new STable(path, table.getGeneration());
         }
     }
+
     @NotNull
     private ByteBuffer getKey(final int index) throws IOException {
         long offset = getOffset(index);
@@ -110,6 +110,7 @@ public final class STable implements Comparable<STable> {
         channel.read(keyBuffer, offset);
         return keyBuffer.rewind();
     }
+
     @NotNull
     private Cell getCell(final int index) throws IOException {
         long offset = getOffset(index);

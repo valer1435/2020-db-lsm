@@ -8,7 +8,7 @@ public class Value implements Comparable<Value> {
     private final ByteBuffer data;
     private final boolean isTombstone;
 
-    Value(@Nullable ByteBuffer data, final boolean isTombstone) {
+    Value(@Nullable final ByteBuffer data, final boolean isTombstone) {
         this.data = data;
         this.timestamp = System.currentTimeMillis();
         this.isTombstone = isTombstone;

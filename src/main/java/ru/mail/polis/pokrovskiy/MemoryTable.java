@@ -57,6 +57,6 @@ class MemoryTable {
     void restart() {
         map.clear();
         generation++;
-        sizeInBytes=0;
+        sizeInBytes = 0;
     }
 }

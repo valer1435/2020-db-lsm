@@ -1,5 +1,6 @@
 package ru.mail.polis.pokrovskiy;
 
+import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
 
 public class Value implements Comparable<Value> {
@@ -7,14 +8,13 @@ public class Value implements Comparable<Value> {
     private final ByteBuffer data;
     private final boolean isTombstone;
 
-    Value(final ByteBuffer data, final boolean isTombstone) {
+    Value(@Nullable ByteBuffer data, final boolean isTombstone) {
         this.data = data;
-
-        timestamp = System.currentTimeMillis();
+        this.timestamp = System.currentTimeMillis();
         this.isTombstone = isTombstone;
     }
 
-    Value(final ByteBuffer data, final long timestamp, final boolean isTombstone) {
+    Value(@Nullable final ByteBuffer data, final long timestamp, final boolean isTombstone) {
         this.data = data;
         this.timestamp = timestamp;
         this.isTombstone = isTombstone;
@@ -24,6 +24,7 @@ public class Value implements Comparable<Value> {
         return timestamp;
     }
 
+    @Nullable
     ByteBuffer getData() {
         return data;
     }

@@ -3,6 +3,7 @@ package ru.mail.polis.pokrovskiy;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -20,19 +21,20 @@ import java.util.Iterator;
 import java.util.List;
 
 public final class STable implements Comparable<STable> {
-    private static final String EXTENTION = ".data";
+    private static final String EXTENSION = ".data";
     private static final String PREFIX = "LSM-DB-GEN-";
     private final long generation;
     private final int rowCount;
     private final FileChannel channel;
 
-    private STable(final Path file, final long generation) throws IOException {
+    private STable(@NotNull final Path file, @NotNull final Long generation) throws IOException {
         channel = FileChannel.open(file, StandardOpenOption.READ);
         this.generation = generation;
         rowCount = getRowCount();
     }
 
-    static List<STable> findTables(final Path path) throws IOException {
+    @NotNull
+    static List<STable> findTables(@NotNull final Path path) throws IOException {
         final List<STable> tables = new ArrayList<>();
         Files.walkFileTree(path, EnumSet.noneOf(FileVisitOption.class), 1, new SimpleFileVisitor<>() {
             @Override
@@ -42,7 +44,6 @@ public final class STable implements Comparable<STable> {
 
                 if (file.getFileName().toString().endsWith(".data")) {
                     tables.add(new STable(file, getVersionFromName(file.getFileName().toString())));
-
                 }
                 return FileVisitResult.CONTINUE;
             }
@@ -50,9 +51,9 @@ public final class STable implements Comparable<STable> {
         });
         return tables;
     }
-
-    static STable writeTable(final MemoryTable table, final Path pathToFile) throws IOException {
-        final Path path = pathToFile.resolve(PREFIX + table.getGeneration() + EXTENTION);
+    @NotNull
+    static STable writeTable(@NotNull final MemoryTable table, @NotNull final Path pathToFile) throws IOException {
+        final Path path = pathToFile.resolve(PREFIX + table.getGeneration() + EXTENSION);
         try (FileChannel channel = FileChannel.open(path,
                 StandardOpenOption.WRITE,
                 StandardOpenOption.CREATE_NEW)) {
@@ -95,7 +96,7 @@ public final class STable implements Comparable<STable> {
             return new STable(path, table.getGeneration());
         }
     }
-
+    @NotNull
     private ByteBuffer getKey(final int index) throws IOException {
         long offset = getOffset(index);
 
@@ -109,7 +110,7 @@ public final class STable implements Comparable<STable> {
         channel.read(keyBuffer, offset);
         return keyBuffer.rewind();
     }
-
+    @NotNull
     private Cell getCell(final int index) throws IOException {
         long offset = getOffset(index);
 
@@ -157,9 +158,9 @@ public final class STable implements Comparable<STable> {
         }
     }
 
+    @NotNull
     Iterator<Cell> iteratorFromTable(final ByteBuffer from) throws IOException {
         return new Iterator<>() {
-
             private int position = findIndex(from, 0, rowCount - 1);
 
             @Override
@@ -172,7 +173,7 @@ public final class STable implements Comparable<STable> {
                 try {
                     return getCell(position++);
                 } catch (IOException e) {
-                   return null;
+                    return null;
                 }
             }
         };
@@ -182,7 +183,6 @@ public final class STable implements Comparable<STable> {
         final ByteBuffer rowCountBuffer = ByteBuffer.allocate(Integer.BYTES);
         final long rowCountOff = channel.size() - Integer.BYTES;
         channel.read(rowCountBuffer, rowCountOff);
-
         return rowCountBuffer.rewind().getInt();
     }
 
@@ -193,8 +193,8 @@ public final class STable implements Comparable<STable> {
         return offsetBuffer.rewind().getLong();
     }
 
-    private static int getVersionFromName(final String fileName) {
-        return Integer.parseInt(Iterables.get(Splitter.on("LSM-DB-GEN-").split(fileName), 1).replaceAll("\\.data", ""));
+    private static long getVersionFromName(final String fileName) {
+        return Long.parseLong(Iterables.get(Splitter.on("LSM-DB-GEN-").split(fileName), 1).replaceAll("\\.data", ""));
     }
 
     private int findIndex(final ByteBuffer from, final int left, final int right) throws IOException {
@@ -219,7 +219,7 @@ public final class STable implements Comparable<STable> {
         return curLeft;
     }
 
-    long getGeneration() {
+    private long getGeneration() {
         return generation;
     }
 

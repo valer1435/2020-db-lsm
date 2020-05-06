@@ -10,14 +10,14 @@ import java.util.TreeMap;
 class MemoryTable {
     private final SortedMap<ByteBuffer, Value> map;
     private long sizeInBytes;
-    private final long generation;
+    private long generation;
 
     MemoryTable(final long generation) {
-        map = new TreeMap<>();
+        this.map = new TreeMap<>();
         this.generation = generation;
     }
 
-    Iterator<Cell> iterator(@NotNull final ByteBuffer from) {
+    @NotNull Iterator<Cell> iterator(@NotNull final ByteBuffer from) {
         return map.tailMap(from).entrySet()
                 .stream()
                 .map(o -> Cell.of(o.getKey(), o.getValue(), getGeneration())).iterator();
@@ -52,5 +52,11 @@ class MemoryTable {
 
     long getGeneration() {
         return generation;
+    }
+
+    void restart() {
+        map.clear();
+        generation++;
+        sizeInBytes=0;
     }
 }

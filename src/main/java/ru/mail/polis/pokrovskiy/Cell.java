@@ -25,15 +25,15 @@ public class Cell implements Comparable<Cell> {
         return new Cell(key, value, generation);
     }
 
-    public ByteBuffer getKey() {
+    public @NotNull ByteBuffer getKey() {
         return key;
     }
 
-    public Value getValue() {
+    public @NotNull Value getValue() {
         return value;
     }
 
-    private long getGeneration() {
+    private @NotNull Long getGeneration() {
         return generation;
     }
 

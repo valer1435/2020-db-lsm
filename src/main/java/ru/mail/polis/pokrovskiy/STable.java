@@ -26,9 +26,9 @@ public final class STable implements Comparable<STable> {
     private final FileChannel channel;
 
     private STable(@NotNull final Path file, @NotNull final Long generation) throws IOException {
-        channel = FileChannel.open(file, StandardOpenOption.READ);
+        this.channel = FileChannel.open(file, StandardOpenOption.READ);
         this.generation = generation;
-        rowCount = getRowCount();
+        this.rowCount = getRowCount();
     }
 
     @NotNull

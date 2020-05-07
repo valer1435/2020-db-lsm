@@ -53,10 +53,4 @@ class MemoryTable {
     long getGeneration() {
         return generation;
     }
-
-    void restart() {
-        map.clear();
-        generation++;
-        sizeInBytes = 0;
-    }
 }

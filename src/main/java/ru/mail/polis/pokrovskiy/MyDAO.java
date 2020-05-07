@@ -18,10 +18,10 @@ public class MyDAO implements DAO {
     static final ByteBuffer MIN_BYTE_BUFFER = ByteBuffer.allocate(0);
     private final long maxSize;
     private final Path filesPath;
-    private final MemoryTable memTable;
+    private MemoryTable memTable;
     private long generation;
     private final List<STable> tableList;
-    private static final double PERCENT = 0.016;
+
 
     /** Имплементация Key-value хранилища.
      * @param filesPath - путь до файла
@@ -29,7 +29,7 @@ public class MyDAO implements DAO {
      * @throws IOException - сли возникли ошибки с файлами
      */
     public MyDAO(@NotNull final Path filesPath, final long maxSize) throws IOException {
-        this.maxSize = (long) (maxSize * PERCENT);
+        this.maxSize = maxSize;
         this.filesPath = filesPath;
         this.tableList = STable.findTables(filesPath);
         this.generation = tableList.size() + 1L;
@@ -74,8 +74,8 @@ public class MyDAO implements DAO {
     private void flush() throws IOException {
         tableList.add(STable.writeTable(memTable, filesPath));
         generation += 1;
-        memTable.restart();
-        generation = memTable.getGeneration();
+        memTable = new MemoryTable(generation);
+
     }
 
     @Override

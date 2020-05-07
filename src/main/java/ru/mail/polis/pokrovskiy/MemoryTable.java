@@ -10,7 +10,7 @@ import java.util.TreeMap;
 class MemoryTable {
     private final SortedMap<ByteBuffer, Value> map;
     private long sizeInBytes;
-    private long generation;
+    private final long generation;
 
     MemoryTable(final long generation) {
         this.map = new TreeMap<>();

@@ -22,7 +22,6 @@ public class MyDAO implements DAO {
     private long generation;
     private final List<STable> tableList;
 
-
     /** Имплементация Key-value хранилища.
      * @param filesPath - путь до файла
      * @param maxSize - максимальный размер
@@ -34,7 +33,6 @@ public class MyDAO implements DAO {
         this.tableList = STable.findTables(filesPath);
         this.generation = tableList.size() + 1L;
         this.memTable = new MemoryTable(generation);
-
     }
 
     @NotNull

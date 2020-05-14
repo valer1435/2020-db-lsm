@@ -63,7 +63,10 @@ public final class STable implements Comparable<STable> {
                 if (file.getFileName().toString().endsWith(EXTENSION) && !file.equals(newFilePath)) {
                     Files.delete(file);
                 } else {
-                Files.move(newFilePath, newFilePath.resolveSibling(PREFIX + MyDAO.MIN_VERSION + EXTENSION), StandardCopyOption.ATOMIC_MOVE);
+                Files.move(
+                        newFilePath,
+                        newFilePath.resolveSibling(PREFIX + MyDAO.MIN_VERSION + EXTENSION),
+                        StandardCopyOption.ATOMIC_MOVE);
                 }
                 return FileVisitResult.CONTINUE;
             }
@@ -72,7 +75,9 @@ public final class STable implements Comparable<STable> {
     }
 
     @NotNull
-    static STable writeTable(@NotNull final Iterator<Cell> cellIterator, @NotNull final Long generation, @NotNull final Path pathToFile) throws IOException {
+    static STable writeTable(@NotNull final Iterator<Cell> cellIterator,
+                             @NotNull final Long generation,
+                             @NotNull final Path pathToFile) throws IOException {
         final Path path = pathToFile.resolve(PREFIX + generation + EXTENSION);
         try (FileChannel channel = FileChannel.open(path,
                 StandardOpenOption.WRITE,
@@ -114,8 +119,7 @@ public final class STable implements Comparable<STable> {
             return new STable(path, generation);
         }
     }
-
-
+    
     @NotNull
     private ByteBuffer getKey(final int index) throws IOException {
         long offset = getOffset(index);

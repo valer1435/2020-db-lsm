@@ -257,7 +257,6 @@ public final class STable implements Comparable<STable> {
         channel.close();
     }
 
-
     public Path getFile() {
         return file;
     }

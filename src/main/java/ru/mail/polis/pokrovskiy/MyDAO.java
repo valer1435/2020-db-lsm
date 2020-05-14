@@ -16,12 +16,12 @@ import java.util.List;
 
 public class MyDAO implements DAO {
     static final long MIN_VERSION = 0;
-    static final ByteBuffer MIN_BYTE_BUFFER = ByteBuffer.allocate(0);
+    private static final ByteBuffer MIN_BYTE_BUFFER = ByteBuffer.allocate(0);
     private final long maxSize;
     private final Path filesPath;
     private MemoryTable memTable;
     private long generation;
-    private List<STable> tableList;
+    private final List<STable> tableList;
 
     /** Имплементация Key-value хранилища.
      * @param filesPath - путь до файла
@@ -39,20 +39,13 @@ public class MyDAO implements DAO {
     @NotNull
     @Override
     public Iterator<Record> iterator(@NotNull final ByteBuffer from) throws IOException {
-        final List<Iterator<Cell>> cellIterator = new ArrayList<>();
-        for (final STable table : tableList) {
-            cellIterator.add(table.iteratorFromTable(from));
-        }
-        cellIterator.add(memTable.iterator(from));
-        final UnmodifiableIterator<Cell> sortedIterator =
-                Iterators.mergeSorted(cellIterator, Comparator.naturalOrder());
-        final Iterator<Cell> collapsedIterator = Iters.collapseEquals(sortedIterator, Cell::getKey);
+        final Iterator<Cell> cellIterator = cellIterator(from);
         final Iterator<Cell> filteredIterator = Iterators
-                .filter(collapsedIterator, cell -> !cell.getValue().isTombstone());
+                .filter(cellIterator, cell -> !cell.getValue().isTombstone());
         return Iterators.transform(filteredIterator, cell -> Record.of(cell.getKey(), cell.getValue().getData()));
     }
 
-    public Iterator<Cell> cellIterator(@NotNull final ByteBuffer from) throws IOException {
+    private Iterator<Cell> cellIterator(@NotNull final ByteBuffer from) throws IOException {
         final List<Iterator<Cell>> cellIterator = new ArrayList<>();
         for (final STable table : tableList) {
             cellIterator.add(table.iteratorFromTable(from));
@@ -60,8 +53,7 @@ public class MyDAO implements DAO {
         cellIterator.add(memTable.iterator(from));
         final UnmodifiableIterator<Cell> sortedIterator =
                 Iterators.mergeSorted(cellIterator, Comparator.naturalOrder());
-        final Iterator<Cell> collapsedIterator = Iters.collapseEquals(sortedIterator, Cell::getKey);
-        return collapsedIterator;
+        return Iters.collapseEquals(sortedIterator, Cell::getKey);
     }
 
     @Override
@@ -83,7 +75,7 @@ public class MyDAO implements DAO {
     }
 
     private void flush() throws IOException {
-        tableList.add(STable.writeTable(memTable, filesPath));
+        tableList.add(STable.writeTable(memTable.iterator(MIN_BYTE_BUFFER), memTable.getGeneration(), filesPath));
         generation += 1;
         memTable = new MemoryTable(generation);
 
@@ -102,15 +94,16 @@ public class MyDAO implements DAO {
     @Override
     public void compact() throws IOException {
         final Iterator<Cell> cells = cellIterator(MIN_BYTE_BUFFER);
-        final STable compactTable = STable.writeCompactTable(cells, filesPath);
-        for (STable table: tableList) {
+        generation = MIN_VERSION;
+        final STable compactTable = STable.writeTable(cells, generation, filesPath);
+        for (final STable table: tableList) {
             table.close();
         }
         tableList.clear();
         STable.compact(filesPath, compactTable.getFile());
         tableList.add(compactTable);
-        generation = MyDAO.MIN_VERSION+1;
-        memTable = new MemoryTable(generation+1);
+        generation++;
+        memTable = new MemoryTable(generation);
     }
 
 }

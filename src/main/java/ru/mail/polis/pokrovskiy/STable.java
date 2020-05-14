@@ -2,16 +2,12 @@ package ru.mail.polis.pokrovskiy;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
 import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.file.FileVisitOption;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -24,11 +20,13 @@ public final class STable implements Comparable<STable> {
     private final long generation;
     private final int rowCount;
     private final FileChannel channel;
+    private final Path file;
 
     private STable(@NotNull final Path file, @NotNull final Long generation) throws IOException {
         this.channel = FileChannel.open(file, StandardOpenOption.READ);
         this.generation = generation;
         this.rowCount = getRowCount();
+        this.file = file;
     }
 
     @NotNull
@@ -48,6 +46,25 @@ public final class STable implements Comparable<STable> {
 
         });
         return tables;
+    }
+
+
+    static void compact(@NotNull final Path path, @NotNull Path newFilePath) throws IOException {
+        Files.walkFileTree(path, EnumSet.noneOf(FileVisitOption.class), 1, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(
+                    final Path file,
+                    final BasicFileAttributes attrs) throws IOException {
+
+                if (file.getFileName().toString().endsWith(".data") && !file.equals(newFilePath)) {
+                    Files.delete(file);
+                }else {
+                Files.move(newFilePath, newFilePath.resolveSibling(PREFIX+MyDAO.MIN_VERSION+EXTENSION), StandardCopyOption.ATOMIC_MOVE);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+        });
     }
 
     @NotNull
@@ -93,6 +110,49 @@ public final class STable implements Comparable<STable> {
             channel.write(rowCountBuffer);
 
             return new STable(path, table.getGeneration());
+        }
+    }
+
+    @NotNull
+    static STable writeCompactTable(@NotNull final Iterator<Cell> cellIterator, @NotNull final Path pathToFile) throws IOException {
+        final Path path = pathToFile.resolve(PREFIX + MyDAO.MIN_VERSION+ EXTENSION);
+        try (FileChannel channel = FileChannel.open(path,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.CREATE_NEW)) {
+            final List<Integer> offsetList = new ArrayList<>();
+            while (cellIterator.hasNext()) {
+                final Cell cell = cellIterator.next();
+                offsetList.add((int) channel.position());
+
+                final long keySize = cell.getKey().limit();
+                channel.write(ByteBuffer.allocate(Long.BYTES).putLong(keySize).flip());
+                channel.write(ByteBuffer.allocate((int) keySize).put(cell.getKey()).flip());
+
+                final long timeStamp = cell.getValue().getTimestamp();
+                channel.write(ByteBuffer.allocate(Long.BYTES).putLong(timeStamp).flip());
+
+                final boolean tombstone = cell.getValue().isTombstone();
+                channel.write(ByteBuffer.allocate(Byte.BYTES).put((byte) (tombstone ? 1 : 0)).flip());
+
+                if (!tombstone) {
+                    final long valueSize = cell.getValue().getData().limit();
+                    channel.write(ByteBuffer.allocate(Long.BYTES).putLong(valueSize).flip());
+                    channel.write(ByteBuffer.allocate((int) valueSize).put(cell.getValue().getData()).flip());
+                }
+            }
+
+            final ByteBuffer offsetByteBuffer = ByteBuffer.allocate(Long.BYTES * offsetList.size());
+
+            for (final int offset : offsetList) {
+                offsetByteBuffer.putLong(offset);
+            }
+
+            channel.write(offsetByteBuffer.flip());
+            final ByteBuffer rowCountBuffer = ByteBuffer.allocate(Integer.BYTES);
+            rowCountBuffer.putInt(offsetList.size()).flip();
+            channel.write(rowCountBuffer);
+
+            return new STable(path, MyDAO.MIN_VERSION);
         }
     }
 
@@ -232,4 +292,10 @@ public final class STable implements Comparable<STable> {
     void close() throws IOException {
         channel.close();
     }
+
+
+    public Path getFile() {
+        return file;
+    }
+
 }

@@ -15,12 +15,13 @@ import java.util.Iterator;
 import java.util.List;
 
 public class MyDAO implements DAO {
+    static final long MIN_VERSION = 0;
     static final ByteBuffer MIN_BYTE_BUFFER = ByteBuffer.allocate(0);
     private final long maxSize;
     private final Path filesPath;
     private MemoryTable memTable;
     private long generation;
-    private final List<STable> tableList;
+    private List<STable> tableList;
 
     /** Имплементация Key-value хранилища.
      * @param filesPath - путь до файла
@@ -49,6 +50,18 @@ public class MyDAO implements DAO {
         final Iterator<Cell> filteredIterator = Iterators
                 .filter(collapsedIterator, cell -> !cell.getValue().isTombstone());
         return Iterators.transform(filteredIterator, cell -> Record.of(cell.getKey(), cell.getValue().getData()));
+    }
+
+    public Iterator<Cell> cellIterator(@NotNull final ByteBuffer from) throws IOException {
+        final List<Iterator<Cell>> cellIterator = new ArrayList<>();
+        for (final STable table : tableList) {
+            cellIterator.add(table.iteratorFromTable(from));
+        }
+        cellIterator.add(memTable.iterator(from));
+        final UnmodifiableIterator<Cell> sortedIterator =
+                Iterators.mergeSorted(cellIterator, Comparator.naturalOrder());
+        final Iterator<Cell> collapsedIterator = Iters.collapseEquals(sortedIterator, Cell::getKey);
+        return collapsedIterator;
     }
 
     @Override
@@ -85,4 +98,19 @@ public class MyDAO implements DAO {
             table.close();
         }
     }
+
+    @Override
+    public void compact() throws IOException {
+        final Iterator<Cell> cells = cellIterator(MIN_BYTE_BUFFER);
+        final STable compactTable = STable.writeCompactTable(cells, filesPath);
+        for (STable table: tableList) {
+            table.close();
+        }
+        tableList.clear();
+        STable.compact(filesPath, compactTable.getFile());
+        tableList.add(compactTable);
+        generation = MyDAO.MIN_VERSION+1;
+        memTable = new MemoryTable(generation+1);
+    }
+
 }

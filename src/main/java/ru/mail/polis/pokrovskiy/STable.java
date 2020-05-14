@@ -53,7 +53,7 @@ public final class STable implements Comparable<STable> {
         return tables;
     }
 
-    static void compact(@NotNull final Path path, @NotNull Path newFilePath) throws IOException {
+    static void compact(@NotNull final Path path, @NotNull final Path newFilePath) throws IOException {
         Files.walkFileTree(path, EnumSet.noneOf(FileVisitOption.class), 1, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(
@@ -119,7 +119,7 @@ public final class STable implements Comparable<STable> {
             return new STable(path, generation);
         }
     }
-    
+
     @NotNull
     private ByteBuffer getKey(final int index) throws IOException {
         long offset = getOffset(index);

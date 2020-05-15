@@ -17,14 +17,14 @@ class MemoryTable {
         this.generation = generation;
     }
 
-    @NotNull Iterator<Cell> iterator(@NotNull final ByteBuffer from) {
+    @NotNull
+    Iterator<Cell> iterator(@NotNull final ByteBuffer from) {
         return map.tailMap(from).entrySet()
                 .stream()
                 .map(o -> Cell.of(o.getKey(), o.getValue(), getGeneration())).iterator();
     }
 
     void upsert(@NotNull final ByteBuffer key, @NotNull final ByteBuffer value) {
-
         final Value val = new Value(value, false);
         final Value oldValue = map.put(key, val);
         if (oldValue == null) {
@@ -43,7 +43,6 @@ class MemoryTable {
         } else if (!oldValue.isTombstone()) {
             sizeInBytes -= oldValue.getData().limit();
         }
-
     }
 
     long getSizeInBytes() {
@@ -53,5 +52,4 @@ class MemoryTable {
     long getGeneration() {
         return generation;
     }
-
 }

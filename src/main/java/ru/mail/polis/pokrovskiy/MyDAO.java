@@ -1,7 +1,6 @@
 package ru.mail.polis.pokrovskiy;
 
 import com.google.common.collect.Iterators;
-import com.google.common.collect.UnmodifiableIterator;
 import org.jetbrains.annotations.NotNull;
 import ru.mail.polis.DAO;
 import ru.mail.polis.Iters;
@@ -15,7 +14,6 @@ import java.util.Iterator;
 import java.util.List;
 
 public class MyDAO implements DAO {
-    static final long MIN_VERSION = 0;
     private static final ByteBuffer MIN_BYTE_BUFFER = ByteBuffer.allocate(0);
     private final long maxSize;
     private final Path filesPath;
@@ -51,7 +49,7 @@ public class MyDAO implements DAO {
             cellIterator.add(table.iteratorFromTable(from));
         }
         cellIterator.add(memTable.iterator(from));
-        final UnmodifiableIterator<Cell> sortedIterator =
+        final Iterator<Cell> sortedIterator =
                 Iterators.mergeSorted(cellIterator, Comparator.naturalOrder());
         return Iters.collapseEquals(sortedIterator, Cell::getKey);
     }
@@ -78,7 +76,6 @@ public class MyDAO implements DAO {
         tableList.add(STable.writeTable(memTable.iterator(MIN_BYTE_BUFFER), memTable.getGeneration(), filesPath));
         generation += 1;
         memTable = new MemoryTable(generation);
-
     }
 
     @Override
@@ -94,16 +91,14 @@ public class MyDAO implements DAO {
     @Override
     public void compact() throws IOException {
         final Iterator<Cell> cells = cellIterator(MIN_BYTE_BUFFER);
-        generation = MIN_VERSION;
         final STable compactTable = STable.writeTable(cells, generation, filesPath);
         for (final STable table: tableList) {
             table.close();
         }
         tableList.clear();
-        STable.compact(filesPath, compactTable.getFile());
+        STable.deleteOldTables(filesPath, compactTable.getFile());
         tableList.add(compactTable);
         generation++;
         memTable = new MemoryTable(generation);
     }
-
 }

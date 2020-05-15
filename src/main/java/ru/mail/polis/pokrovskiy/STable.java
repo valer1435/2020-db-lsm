@@ -42,7 +42,6 @@ public final class STable implements Comparable<STable> {
             public FileVisitResult visitFile(
                     final Path file,
                     final BasicFileAttributes attrs) throws IOException {
-
                 if (file.getFileName().toString().endsWith(EXTENSION)) {
                     tables.add(new STable(file, getVersionFromName(file.getFileName().toString())));
                 }
@@ -53,24 +52,17 @@ public final class STable implements Comparable<STable> {
         return tables;
     }
 
-    static void compact(@NotNull final Path path, @NotNull final Path newFilePath) throws IOException {
+    static void deleteOldTables(@NotNull final Path path, @NotNull final Path newFilePath) throws IOException {
         Files.walkFileTree(path, EnumSet.noneOf(FileVisitOption.class), 1, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(
                     final Path file,
                     final BasicFileAttributes attrs) throws IOException {
-
                 if (file.getFileName().toString().endsWith(EXTENSION) && !file.equals(newFilePath)) {
                     Files.delete(file);
-                } else {
-                Files.move(
-                        newFilePath,
-                        newFilePath.resolveSibling(PREFIX + MyDAO.MIN_VERSION + EXTENSION),
-                        StandardCopyOption.ATOMIC_MOVE);
                 }
                 return FileVisitResult.CONTINUE;
             }
-
         });
     }
 
@@ -82,7 +74,6 @@ public final class STable implements Comparable<STable> {
         try (FileChannel channel = FileChannel.open(path,
                 StandardOpenOption.WRITE,
                 StandardOpenOption.CREATE_NEW)) {
-
             final List<Integer> offsetList = new ArrayList<>();
             while (cellIterator.hasNext()) {
                 final Cell cell = cellIterator.next();
@@ -106,7 +97,6 @@ public final class STable implements Comparable<STable> {
             }
 
             final ByteBuffer offsetByteBuffer = ByteBuffer.allocate(Long.BYTES * offsetList.size());
-
             for (final int offset : offsetList) {
                 offsetByteBuffer.putLong(offset);
             }
@@ -162,10 +152,8 @@ public final class STable implements Comparable<STable> {
         final boolean tombstone = tombstoneBuffer.rewind().get() != 0;
 
         if (tombstone) {
-
             return new Cell(key, new Value(null, timeStamp, true), getGeneration());
         } else {
-
             offset += Byte.BYTES;
 
             final ByteBuffer valueSizeBuffer = ByteBuffer.allocate(Long.BYTES);
@@ -219,7 +207,7 @@ public final class STable implements Comparable<STable> {
     }
 
     private static long getVersionFromName(final String fileName) {
-        return Long.parseLong(Iterables.get(Splitter.on("LSM-DB-GEN-").split(fileName), 1).replaceAll("\\.data", ""));
+        return Long.parseLong(Iterables.get(Splitter.on(PREFIX).split(fileName), 1).replaceAll(EXTENSION, ""));
     }
 
     private int findIndex(final ByteBuffer from, final int left, final int right) throws IOException {
@@ -260,5 +248,4 @@ public final class STable implements Comparable<STable> {
     public Path getFile() {
         return file;
     }
-
 }
